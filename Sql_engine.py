@@ -2,13 +2,13 @@ import sqlparse
 import csv
 import os
 import sys
-import utils
 from collections import defaultdict 
 
 tables_to_col, table_data = defaultdict(list), defaultdict(list)
 metafile = "metadata.txt"
 m = "meta"
 f = "file"
+ext = ".csv"
 
 def throw_error(type):
 
@@ -44,11 +44,13 @@ def read_data_files():
 
     for file in tables_to_col:
         try:
-            f = open(file + ".csv", "r")
+            with open(file + ext, "r") as data_file:
+                data = csv.reader(data_file)
+                for row in data:
+                    table_data[file].append(row)
         except:
-            throw_error(f)
-        rows = f.readlines()
-        table_data[file] = rows        
+            throw_error(f) 
+              
 
 
 def get_data():
@@ -62,7 +64,7 @@ def get_data():
 def start():
 
     get_data()
-    # process_query()
+    
 
 start()
 
