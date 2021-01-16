@@ -54,13 +54,37 @@ def read_data_files():
 def get_data():
 
     read_meta_data()
-    print(tables_to_col)
+    # print(tables_to_col)
     read_data_files()
-    print(table_data)
-    
+    # print(table_data)
+def check_semicolon(query):
+
+    if ";" not in query:
+        return False
+    return True
+
+def parse_query(query):
+
+    query = sqlparse.format(query,keyword_case = 'upper')
+    if check_semicolon(query) == False:
+        print("Semi-colon is missing in query")
+        sys.exit()
+    query = query.strip(";")
+    # print(query)
+    parsed_query = sqlparse.parse(query)[0].tokens
+    # print(parsed_query)
+    ids = sqlparse.sql.IdentifierList(parsed_query).get_identifiers()
+    token_list = [str(id) for id in ids] 
+    print(token_list)  
+
+
+
+def handle_query():
+    parse_query(sys.argv[1])   
 def start():
 
     get_data()
+    handle_query()
     
 
 start()
