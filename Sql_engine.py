@@ -6,6 +6,7 @@ from collections import defaultdict
 
 tables_to_col, table_data = defaultdict(list), defaultdict(list)
 keywords = []
+num_tables = 0
 metafile = "metadata.txt"
 m = "meta"
 f = "file"
@@ -16,13 +17,14 @@ def throw_error(type):
 
     if type == "meta":
         print("Error in meta-data file")
-        sys.exit() 
+         
     elif type == "file":
         print("Error in data file")
-        sys.exit()
+        
     elif type == "invalid":
         print("Invalid query, Please check")
-        sys.exit()
+
+    sys.exit()
     
 
 def read_meta_data():
@@ -82,13 +84,27 @@ def parse_query(query):
     # print(parsed_query)
     ids = sqlparse.sql.IdentifierList(parsed_query).get_identifiers()
     token_list = [str(id) for id in ids] 
-    # print(token_list)  
+    print(token_list)  
     return token_list
+
 def validate_query(keywords):
 
     if "SELECT" not in keywords or "FROM" not in keywords:
         print("SELECT or FROM is missing")
         throw_error(er)
+    if keywords[2] != "FROM":
+        print("No columns to project")
+        throw_error(er)
+    query_tables = keywords[3]
+    # print(query_tables)
+    query_tables = query_tables.split(",")
+    query_tables = [table.strip() for table in query_tables]
+    num_tables = len(query_tables)
+    for table in query_tables:
+        if table not in tables_to_col:
+            print(f"Unknown {table} is given in query")
+            throw_error(er)
+    
     
 def handle_query():
     keywords =  parse_query(sys.argv[1])
