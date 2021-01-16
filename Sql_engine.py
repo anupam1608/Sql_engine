@@ -5,9 +5,11 @@ import sys
 from collections import defaultdict 
 
 tables_to_col, table_data = defaultdict(list), defaultdict(list)
+keywords = []
 metafile = "metadata.txt"
 m = "meta"
 f = "file"
+er = "invalid"
 ext = ".csv"
 
 def throw_error(type):
@@ -18,6 +20,10 @@ def throw_error(type):
     elif type == "file":
         print("Error in data file")
         sys.exit()
+    elif type == "invalid":
+        print("Invalid query, Please check")
+        sys.exit()
+    
 
 def read_meta_data():
     try:
@@ -57,6 +63,7 @@ def get_data():
     # print(tables_to_col)
     read_data_files()
     # print(table_data)
+
 def check_semicolon(query):
 
     if ";" not in query:
@@ -75,12 +82,17 @@ def parse_query(query):
     # print(parsed_query)
     ids = sqlparse.sql.IdentifierList(parsed_query).get_identifiers()
     token_list = [str(id) for id in ids] 
-    print(token_list)  
+    # print(token_list)  
+    return token_list
+def validate_query(keywords):
 
-
-
+    if "SELECT" not in keywords or "FROM" not in keywords:
+        print("SELECT or FROM is missing")
+        throw_error(er)
+    
 def handle_query():
-    parse_query(sys.argv[1])   
+    keywords =  parse_query(sys.argv[1])
+    validate_query(keywords)   
 def start():
 
     get_data()
