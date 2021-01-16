@@ -58,7 +58,6 @@ def get_data():
     read_data_files()
     print(table_data)
     
-## start engine   
 def start():
 
     get_data()
