@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict 
 
 tables_to_col, table_data = defaultdict(list), defaultdict(list)
-keywords = []
+keywords, query_tables = [], []
 num_tables = 0
 metafile = "metadata.txt"
 m = "meta"
@@ -86,29 +86,59 @@ def parse_query(query):
     token_list = [str(id) for id in ids] 
     print(token_list)  
     return token_list
+def get_query_tables(tables):
 
-def validate_query(keywords):
-
-    if "SELECT" not in keywords or "FROM" not in keywords:
-        print("SELECT or FROM is missing")
-        throw_error(er)
-    if keywords[2] != "FROM":
-        print("No columns to project")
-        throw_error(er)
-    query_tables = keywords[3]
+    query_tables = tables.split(",")
+    query_tables = [table.strip()for table in query_tables]
     # print(query_tables)
-    query_tables = query_tables.split(",")
-    query_tables = [table.strip() for table in query_tables]
     num_tables = len(query_tables)
     for table in query_tables:
         if table not in tables_to_col:
             print(f"Unknown {table} is given in query")
             throw_error(er)
+
+    return query_tables, num_tables
+
+def validate_query(keywords):
+
+    if keywords[0] != "SELECT"   or "FROM" not in keywords:
+        print("SELECT or FROM is missing")
+        throw_error(er)
+    if keywords[2] != "FROM":
+        print("No columns to project")
+        throw_error(er)     
     
+    query_tables = get_query_tables(keywords[3])
+    return query_tables    
     
+def cartesian_product(query_tables):
+
+    joined_table, joined_data = [], []
+    for table in query_tables:
+        for col in tables_to_col[table]:
+            joined_table.append(col)
+    for row1 in table_data[query_tables[0]]:
+        for row2 in table_data[query_tables[1]]:
+            joined_data.append(row1 + row2)
+    
+    return joined_table, joined_data
+
+
 def handle_query():
     keywords =  parse_query(sys.argv[1])
-    validate_query(keywords)   
+    query_tables,num_tables =  validate_query(keywords)
+    print("query tables ", query_tables)
+    print(num_tables)
+    if num_tables > 1:
+        joined_table, joined_data = cartesian_product(query_tables)
+    else:
+        joined_table, joined_data = tables_to_col[query_tables[0]], table_data[query_tables[0]]
+    print(joined_table)
+    for row in joined_data:
+        print(row)
+    
+        
+
 def start():
 
     get_data()
