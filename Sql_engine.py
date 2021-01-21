@@ -291,7 +291,26 @@ def handle_where_clause(joined_table, joined_data, distinct_flag, keywords):
 
     return joined_data       
     
-    
+def handle_groupBy(joined_table, joined_data, keywords):
+
+    idx = keywords.index("GROUP BY")
+    if len(keywords) == idx + 1:
+        print("column missing in GROUP BY clause")
+        throw_error(er)
+    groupby_col = keywords[idx + 1]
+    if len(keywords) > idx+2:
+        throw_error(er)
+    if groupby_col not in joined_table:
+        print("Column not present given in groupby clause")
+        throw_error(er)
+    group_set = set()
+    groupby_col_idx = joined_table.index(groupby_col)
+
+    for row in joined_data:
+        group_set.add(row[groupby_col_idx])
+
+    return group_set
+
 
 def handle_query():
     
@@ -306,7 +325,9 @@ def handle_query():
         joined_data = handle_where_clause(joined_table, joined_data, distinct_flag, keywords)
 
     if "Group BY" in keywords:
-        handle_groupBy(joined_table, joined_data, keywords)    
+        group_set = handle_groupBy(joined_table, joined_data, keywords)   
+    
+    
     
     
     
