@@ -8,6 +8,7 @@ from collections import defaultdict
 tables_to_col, table_data = defaultdict(list), defaultdict(list)
 keywords, query_tables = [], []
 operators = ["<=", ">=",">", "<", "="]
+aggregate_functions = ["SUM", "AVG", "MAX", "MIN", "COUNT"]
 num_tables = 0
 metafile = "metadata.txt"
 m = "meta"
@@ -294,6 +295,7 @@ def handle_where_clause(joined_table, joined_data, distinct_flag, keywords):
 def handle_groupBy(joined_table, joined_data, keywords):
 
     idx = keywords.index("GROUP BY")
+    groupby_col = ""
     if len(keywords) == idx + 1:
         print("column missing in GROUP BY clause")
         throw_error(er)
@@ -301,7 +303,7 @@ def handle_groupBy(joined_table, joined_data, keywords):
     if len(keywords) > idx+2:
         throw_error(er)
     if groupby_col not in joined_table:
-        print("Column not present given in groupby clause")
+        print("Column not present given in group by clause")
         throw_error(er)
     group_set = set()
     groupby_col_idx = joined_table.index(groupby_col)
@@ -309,13 +311,62 @@ def handle_groupBy(joined_table, joined_data, keywords):
     for row in joined_data:
         group_set.add(row[groupby_col_idx])
 
-    return group_set
+    return group_set, groupby_col
+
+def extract_cols_and_function(given_cols):
+
+    given_cols = given_cols.split(",")
+    cols_and_aggregate = defaultdict(str)
+    for val in given_cols:
+        l = val.split("(")
+        l = list(map(str.strip, l))
+        if len(l)>2:
+            throw_error(er)
+        if len(l) == 1:
+            cols_and_aggregate[l[0]] == None
+        else:
+            val = l[0].strip()
+            cols_and_aggregate[l[1].split(")")[0].strip()] = val.upper()
+
+    return cols_and_aggregate
+
+def is_valid(cols_with_aggregate, joined_table, groupby_col):
+
+    for col in cols_with_aggregate:
+        if col != "*" and col not in joined_table:
+            print(f"{col} column not found")
+            return False
+        if cols_with_aggregate[col] != "" and cols_with_aggregate[col] not in aggregate_functions:
+            print(f"{cols_with_aggregate[col] } Unknown function")
+            return False
+        if cols_with_aggregate[col] == "" and groupby_col != "" and col != groupby_col:
+            print(f"{col} should in aggregate function or with group by clause")
+            throw_error(er) 
+    
+    return True
+
+
+def handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col):
+    
+    if distinct_flag:
+        given_cols = keywords[2]
+    else:
+        given_cols = keywords[1]
+    
+    cols_with_aggregate = extract_cols_and_function(given_cols)
+    print(cols_with_aggregate)
+    if is_valid(cols_with_aggregate, joined_table, groupby_col) == False:
+        throw_error(er)
+    
+
+
 
 
 def handle_query():
     
     keywords =  parse_query(sys.argv[1])
-    query_tables,num_tables, distinct_flag, where_flag =  validate_query(keywords)    
+    query_tables,num_tables, distinct_flag, where_flag =  validate_query(keywords) 
+    group_set = set()   
     if num_tables > 1:
         joined_table, joined_data = cartesian_product(query_tables)
     else:
@@ -324,13 +375,11 @@ def handle_query():
     if where_flag:
         joined_data = handle_where_clause(joined_table, joined_data, distinct_flag, keywords)
 
-    if "Group BY" in keywords:
-        group_set = handle_groupBy(joined_table, joined_data, keywords)   
+    if "GROUP BY" in keywords:
+        group_set, groupby_col = handle_groupBy(joined_table, joined_data, keywords) 
     
-    
-    
-    
-    
+    handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col)
+      
     
         
 
