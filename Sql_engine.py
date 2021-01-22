@@ -174,18 +174,19 @@ def extract_operator(left_condition, right_condition):
 
     return operators_present
 
-def get_operands(joined_table, condition, operator_present):
+def get_operands(joined_table, condition, operator):
 
-    # print("In get_operands")
+    print("In get_operands")
+    print(operator)
     operands_present = []
     if condition == "":
         return operands_present
-    for operator in operator_present:
-        if operator in condition:
-            # print("operator ", operator)
-            operands_present = condition.split(operator)
-            operands_present = list(map(str.strip,operands_present))
-            break
+    
+    if operator in condition:
+        print("operator ", operator)
+        operands_present = condition.split(operator)
+        operands_present = list(map(str.strip,operands_present))
+        
     # print(operands_present)
 
     if len(operands_present)<2:
@@ -286,8 +287,10 @@ def handle_where_clause(joined_table, joined_data, distinct_flag, keywords):
     # print("left", left_condition)
     # print("right", right_condition)
     operator_present = extract_operator(left_condition, right_condition)    
-    left_condition_operands = get_operands(joined_table, left_condition, operator_present)
-    right_condition_operands = get_operands(joined_table, right_condition, operator_present)
+    left_condition_operands = get_operands(joined_table, left_condition, operator_present[0])
+    right_condition_operands = get_operands(joined_table, right_condition, operator_present[1])
+    print("left",left_condition_operands)
+    print("right", right_condition_operands)
     joined_data = apply_where(joined_table, joined_data, operation_flag, operator_present, left_condition_operands, right_condition_operands)
 
     return joined_data       
@@ -317,6 +320,7 @@ def extract_cols_and_function(given_cols):
 
     given_cols = given_cols.split(",")
     cols_and_aggregate = defaultdict(str)
+    aggregate_flag = False
     for val in given_cols:
         l = val.split("(")
         l = list(map(str.strip, l))
@@ -327,8 +331,9 @@ def extract_cols_and_function(given_cols):
         else:
             val = l[0].strip()
             cols_and_aggregate[l[1].split(")")[0].strip()] = val.upper()
+            aggregate_flag = True
 
-    return cols_and_aggregate
+    return cols_and_aggregate, aggregate_flag
 
 def is_valid(cols_with_aggregate, joined_table, groupby_col):
 
@@ -340,23 +345,108 @@ def is_valid(cols_with_aggregate, joined_table, groupby_col):
             print(f"{cols_with_aggregate[col] } Unknown function")
             return False
         if cols_with_aggregate[col] == "" and groupby_col != "" and col != groupby_col:
-            print(f"{col} should in aggregate function or with group by clause")
-            throw_error(er) 
+            print(f"{col} should be in aggregate function or with group by clause")
+            return False
     
     return True
+def apply_aggregate(joined_table, joined_data, col, function, groupby_col = "", group_identifier = 0):
+
+    col_idx = joined_table.index(col)
+    col_values = []
+    for row in joined_data:
+        if groupby_col == "":
+            col_values.append(int(row[col_idx]))
+        else:
+            idx = joined_table.index(groupby_col)
+            if row[idx] == group_identifier:
+                col_values.append(int(row[col_idx]))
+     
+    if function == "SUM":
+        return sum(col_values)
+    elif function == "MIN":
+        return min(col_values)
+    elif function == "MAX":
+        return max(col_values)
+    elif function == "AVG":
+        return sum(col_values)/len(col_values)
+    elif function == "COUNT":
+        return len(col_values)
 
 
-def handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col):
+def apply_select(joined_table, joined_data, cols_with_aggregate, aggregate_flag, groupby_col, group_set):
+    # print(aggregate_flag, groupby_col, group_set)
+    result_table, result_data = [], []
+    if aggregate_flag == False:
+        if groupby_col == "":
+            if "*" in cols_with_aggregate and len(cols_with_aggregate) == 1:
+                result_table, result_data = joined_table, joined_data
+            elif "*" in cols_with_aggregate and len(cols_with_aggregate)>1:
+                throw_error(er)
+            else:
+                for col in cols_with_aggregate:
+                    result_table.append(col)
+                for row in joined_data:
+                    temp_list = []
+                    for col in result_table:
+                        idx = joined_table.index(col)
+                        temp_list.append(row[idx])
+                    result_data.append(temp_list)
+        else:
+            result_table.append(groupby_col)
+            for val in group_set:
+                temp_list = []
+                temp_list.append(val)
+                result_data.append(temp_list)
+    
+    else:
+        if groupby_col == "":
+            for col in cols_with_aggregate:
+                if col == "*" and cols_with_aggregate[col] == "COUNT":
+                    result_table.append("COUNT(*)")
+                    result_data.append(len(joined_data))
+                elif col == "*" and cols_with_aggregate[col] != "COUNT":
+                    throw_error(er)
+                elif cols_with_aggregate[col] == "":
+                    throw_error(er)
+                else:
+                    result_table.append(cols_with_aggregate[col] + "(" + col + ")")
+                    result_data.append(apply_aggregate(joined_table, joined_data, col, cols_with_aggregate[col]))
+        else:
+            result_table.append(groupby_col)
+            for col in cols_with_aggregate:
+                if col != groupby_col and cols_with_aggregate[col] == "" or col == "*":
+                    throw_error(er)
+                if col == groupby_col:
+                    continue
+
+                result_table.append(cols_with_aggregate[col] + "(" + col + ")")
+                for group_identifier in group_set:
+                    temp_list = []
+                    temp_list.append(group_identifier) 
+                    temp_list.append(apply_aggregate(joined_table, joined_data, col, cols_with_aggregate[col], groupby_col, group_identifier))     
+                    result_data.append(temp_list)
+
+    return result_table,result_data                
+ 
+ 
+def handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col, group_set):
     
     if distinct_flag:
         given_cols = keywords[2]
     else:
         given_cols = keywords[1]
     
-    cols_with_aggregate = extract_cols_and_function(given_cols)
-    print(cols_with_aggregate)
+    cols_with_aggregate, aggregate_flag = extract_cols_and_function(given_cols)
+    # print(cols_with_aggregate)
     if is_valid(cols_with_aggregate, joined_table, groupby_col) == False:
         throw_error(er)
+    print(joined_table)
+    for row in joined_data:
+        print(row)
+    joined_table,  joined_data = apply_select(joined_table, joined_data, cols_with_aggregate, aggregate_flag, groupby_col, group_set)   
+    print(joined_table)
+    for row in joined_data:
+        print(row)
     
 
 
@@ -366,7 +456,7 @@ def handle_query():
     
     keywords =  parse_query(sys.argv[1])
     query_tables,num_tables, distinct_flag, where_flag =  validate_query(keywords) 
-    group_set = set()   
+    group_set, groupby_col = set(), ""   
     if num_tables > 1:
         joined_table, joined_data = cartesian_product(query_tables)
     else:
@@ -378,7 +468,7 @@ def handle_query():
     if "GROUP BY" in keywords:
         group_set, groupby_col = handle_groupBy(joined_table, joined_data, keywords) 
     
-    handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col)
+    handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col, group_set)
       
     
         
@@ -388,7 +478,5 @@ def start():
     get_data()
     handle_query()
     
-
 start()
-### handle - where, aggregate, group by, order by, project 
 
