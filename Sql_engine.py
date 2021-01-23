@@ -5,10 +5,11 @@ import os
 import sys
 from collections import defaultdict 
 
-tables_to_col, table_data = defaultdict(list), defaultdict(list)
+tables_to_col, table_data, col_to_table = defaultdict(list), defaultdict(list), defaultdict(str)
 keywords, query_tables = [], []
 operators = ["<=", ">=",">", "<", "="]
 aggregate_functions = ["SUM", "AVG", "MAX", "MIN", "COUNT"]
+order_possible = ["ASC", "DESC"]
 num_tables = 0
 metafile = "metadata.txt"
 m = "meta"
@@ -46,6 +47,7 @@ def read_meta_data():
             flag = False
         elif line != "<end_table>":
             tables_to_col[name].append(line)
+            col_to_table[line] = name
         else:
             pass   
     
@@ -90,7 +92,7 @@ def parse_query(query):
     # print(parsed_query)
     ids = sqlparse.sql.IdentifierList(parsed_query).get_identifiers()
     token_list = [str(id) for id in ids] 
-    print(token_list)  
+    # print(token_list)  
     return token_list
 
 def get_query_tables(tables):
@@ -176,14 +178,14 @@ def extract_operator(left_condition, right_condition):
 
 def get_operands(joined_table, condition, operator):
 
-    print("In get_operands")
-    print(operator)
+    # print("In get_operands")
+    # print(operator)
     operands_present = []
     if condition == "":
         return operands_present
     
     if operator in condition:
-        print("operator ", operator)
+        # print("operator ", operator)
         operands_present = condition.split(operator)
         operands_present = list(map(str.strip,operands_present))
         
@@ -303,8 +305,8 @@ def handle_groupBy(joined_table, joined_data, keywords):
         print("column missing in GROUP BY clause")
         throw_error(er)
     groupby_col = keywords[idx + 1]
-    if len(keywords) > idx+2:
-        throw_error(er)
+    # if len(keywords) > idx+2:
+    #     throw_error(er)
     if groupby_col not in joined_table:
         print("Column not present given in group by clause")
         throw_error(er)
@@ -407,7 +409,8 @@ def apply_select(joined_table, joined_data, cols_with_aggregate, aggregate_flag,
             for col in cols_with_aggregate:
                 if col == "*" and cols_with_aggregate[col] == "COUNT":
                     result_table.append("COUNT(*)")
-                    result_data.append(len(joined_data))
+                    result_data.append([len(joined_data)])
+                    # print(result_data)
                 elif col == "*" and cols_with_aggregate[col] != "COUNT":
                     throw_error(er)
                 elif cols_with_aggregate[col] == "":
@@ -446,13 +449,13 @@ def handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, g
     # print(cols_with_aggregate)
     if is_valid(cols_with_aggregate, joined_table, groupby_col) == False:
         throw_error(er)
-    print(joined_table)
-    for row in joined_data:
-        print(row)
+    # print(joined_table)
+    # for row in joined_data:
+    #     print(row)
     joined_table,  joined_data = apply_select(joined_table, joined_data, cols_with_aggregate, aggregate_flag, groupby_col, group_set)   
-    print(joined_table)
-    for row in joined_data:
-        print(row)
+    # print(joined_table)
+    # for row in joined_data:
+    #     print(row)
     return joined_table, joined_data
 
 def handle_distinct(joined_data):
@@ -463,6 +466,74 @@ def handle_distinct(joined_data):
             unique_rows.append(row)
     
     return unique_rows
+
+def apply_orderby(joined_table, joined_data, orderby_col, order_type):
+
+    orderby_col_idx = []
+    orderby_col_idx.append(joined_table.index(orderby_col[0]))
+    for i in range(len(joined_data)):
+        for j in range(len(joined_data[i])):
+            joined_data[i][j] = int(joined_data[i][j])
+
+    fn=lambda x:[x[i] for i in orderby_col_idx]
+
+    if order_type == 0:
+        joined_data.sort(key=fn)
+    else:
+        joined_data.sort(key=fn, reverse=True)
+    
+
+    return joined_data
+
+def handle_orderby(joined_table, joined_data, keywords):
+
+    idx = keywords.index("ORDER BY")
+    orderby_col = []
+    if len(keywords) == idx + 1:
+        print("column missing in Order BY clause")
+        throw_error(er)
+    orderby_query = keywords[idx + 1]
+    orderby_query = orderby_query.split()
+    orderby_col.append(orderby_query[0].strip() )   
+    for x in orderby_col:
+        if x not in joined_table:
+            print("Column not present given in order by clause")
+            throw_error(er)
+    order_type = 0 ## 0 - ascending, 1 - descending
+    if len(orderby_query)>1:
+        order_given = orderby_query[1].strip()
+        if order_given not in order_possible:
+            print("Check order by clause")
+            throw_error(er)
+        if order_given == order_possible[1]:
+            order_type = 1
+    # print("Inorder by")
+    # print(orderby_col, order_type)
+    joined_data = apply_orderby(joined_table, joined_data, orderby_col, order_type)  
+    return joined_data
+
+def show_result(joined_table, joined_data):
+
+    for idx in range(len(joined_table)):
+        if joined_table[idx] in col_to_table:
+            joined_table[idx] = (col_to_table[joined_table[idx]] + "." + joined_table[idx]).lower()
+        else:
+            joined_table[idx] = joined_table[idx].lower()
+
+    for idx in range(len(joined_table)):
+        if idx == len(joined_table)-1:
+            print(joined_table[idx])
+        else:
+            print(joined_table[idx]+",", end="")
+    idx = 0
+    # print(joined_data)
+    for row in joined_data:
+        for idx in range(len(row)):
+            if idx == len(joined_table)-1:
+                print(str(row[idx]))
+            else:
+                print(str(row[idx])+",", end="")
+
 
 def handle_query():
     
@@ -479,15 +550,23 @@ def handle_query():
 
     if "GROUP BY" in keywords:
         group_set, groupby_col = handle_groupBy(joined_table, joined_data, keywords) 
-    
+    # print(group_set)
     joined_table, joined_data = handle_cols_to_project(joined_table, joined_data, keywords, distinct_flag, groupby_col, group_set)
 
     if distinct_flag:
         joined_data = handle_distinct(joined_data)
-        print("distinct")
-        for row in joined_data:
-            print(row)
-      
+        # print("distinct")
+        # for row in joined_data:
+        #     print(row)
+
+    if "ORDER BY" in keywords:
+        joined_data = handle_orderby(joined_table, joined_data, keywords)
+        # print("After order by")
+        # for row in joined_data:
+        #     print(row)
+
+
+    show_result(joined_table, joined_data)    
     
         
 
@@ -498,4 +577,3 @@ def start():
     
 start()
 
-#  handle single row 
