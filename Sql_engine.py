@@ -429,11 +429,13 @@ def apply_select(joined_table, joined_data, cols_with_aggregate, aggregate_flag,
                     continue
 
                 result_table.append(cols_with_aggregate[col] + "(" + col + ")")
-                for group_identifier in group_set:
-                    temp_list = []
-                    temp_list.append(group_identifier) 
-                    temp_list.append(apply_aggregate(joined_table, joined_data, col, cols_with_aggregate[col], groupby_col, group_identifier))     
-                    result_data.append(temp_list)
+            for group_identifier in group_set:
+                temp_list = []
+                temp_list.append(group_identifier) 
+                for col in cols_with_aggregate:
+                    if col != groupby_col:
+                        temp_list.append(apply_aggregate(joined_table, joined_data, col, cols_with_aggregate[col], groupby_col, group_identifier))     
+                result_data.append(temp_list)
 
     return result_table,result_data                
  
