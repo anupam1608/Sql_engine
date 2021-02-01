@@ -60,5 +60,5 @@ List of queries that can be executed:
 		
 ### Sample input :
 ```
-	python3 sql-engine.py "SELECT * from table1 ORDER BY C;"
+	python3 Sql_engine.py "SELECT * from table1 ORDER BY C;"
 ```
