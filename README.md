@@ -41,7 +41,7 @@ List of queries that can be executed:
 9. Select/Project Columns(could be any number of columns) from table using
 “​ group by​ ”:
 ```
-          Format: Select col1, COUNT(col2) from table_name group by col1.
+      Format: Select col1, COUNT(col2) from table_name group by col1.
 ```
 
 ### Data Format:
